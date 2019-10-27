@@ -1,7 +1,7 @@
 #include "ofxAudioUnitDSPNode.h"
 #include "ofxAudioUnitBase.h"
 #include "ofxAudioUnitUtils.h"
-#include "TPCircularBuffer.h"
+
 
 // a passthru render callback which copies the rendered samples in the process
 static OSStatus RenderAndCopy(void * inRefCon,
@@ -19,25 +19,8 @@ static OSStatus SilentRenderCallback(void * inRefCon,
 									 UInt32	inNumberFrames,
 									 AudioBufferList * ioData);
 
-typedef enum
-{
-	NodeSourceNone,
-	NodeSourceUnit,
-	NodeSourceCallback
-}
-ofxAudioUnitDSPNodeSourceType;
 
-struct DSPNodeContext
-{
-	ofxAudioUnitDSPNodeSourceType sourceType;
-	ofxAudioUnit * sourceUnit;
-	UInt32 sourceBus;
-	AURenderCallbackStruct sourceCallback;
-	AURenderCallbackStruct processCallback;
-	std::vector<TPCircularBuffer> circularBuffers;
-	std::mutex bufferMutex;
-	
-	DSPNodeContext()
+	ofxAudioUnitDSPNode::DSPNodeContext::DSPNodeContext()
 	: sourceBus(0)
 	, sourceType(NodeSourceNone)
 	, sourceCallback((AURenderCallbackStruct){0})
@@ -46,7 +29,7 @@ struct DSPNodeContext
 	, _bufferSize(0)
 	{ }
 	
-	void setCircularBufferSize(UInt32 bufferCount, unsigned int samplesToBuffer) {
+	void ofxAudioUnitDSPNode::DSPNodeContext::setCircularBufferSize(UInt32 bufferCount, unsigned int samplesToBuffer) {
 		if(bufferCount != circularBuffers.size() || samplesToBuffer != _bufferSize) {
 			bufferMutex.lock();
 			{
@@ -65,23 +48,23 @@ struct DSPNodeContext
 		}
 	}
 	
-private:
-	unsigned int _bufferSize;
-};
+//private:
+//	unsigned int _bufferSize;
+//};
 
-struct ofxAudioUnitDSPNode::NodeImpl
-{
-	NodeImpl(unsigned int samplesToBuffer, unsigned int channelsToBuffer)
-	: samplesToBuffer(samplesToBuffer)
-	, channelsToBuffer(channelsToBuffer)
-	{
-		
-	}
-	
-	DSPNodeContext ctx;
-	unsigned int samplesToBuffer;
-	unsigned int channelsToBuffer;
-};
+//struct ofxAudioUnitDSPNode::NodeImpl
+//{
+//	NodeImpl(unsigned int samplesToBuffer, unsigned int channelsToBuffer)
+//	: samplesToBuffer(samplesToBuffer)
+//	, channelsToBuffer(channelsToBuffer)
+//	{
+//		
+//	}
+//	
+//	DSPNodeContext ctx;
+//	unsigned int samplesToBuffer;
+//	unsigned int channelsToBuffer;
+//};
 
 // ----------------------------------------------------------
 ofxAudioUnitDSPNode::ofxAudioUnitDSPNode(unsigned int samplesToBuffer)
@@ -111,7 +94,7 @@ ofxAudioUnit& ofxAudioUnitDSPNode::connectTo(ofxAudioUnit &destination, int dest
 	   (_impl->ctx.sourceType == NodeSourceUnit     && !_impl->ctx.sourceUnit) ||
 	   (_impl->ctx.sourceType == NodeSourceCallback && !_impl->ctx.sourceCallback.inputProc))
 	{
-		std::cout << "Tap can't be connected without a source" << std::endl;
+		std::cout << "DSP Node " << getName()<< " can't be connected without a source" << std::endl;
 		AURenderCallbackStruct silentCallback = {SilentRenderCallback};
 		destination.setRenderCallback(silentCallback);
 		return destination;
@@ -120,6 +103,8 @@ ofxAudioUnit& ofxAudioUnitDSPNode::connectTo(ofxAudioUnit &destination, int dest
 	_impl->ctx.sourceBus = sourceBus;
 	AURenderCallbackStruct callback = {RenderAndCopy, &_impl->ctx};
 	destination.setRenderCallback(callback, destinationBus);
+	destination.setSourceDSPNode(this);
+	
 	return destination;
 }
 
@@ -130,6 +115,8 @@ ofxAudioUnitDSPNode& ofxAudioUnitDSPNode::connectTo(ofxAudioUnitDSPNode &destina
 	_impl->ctx.sourceBus = sourceBus;
 	AURenderCallbackStruct callback = {RenderAndCopy, &_impl->ctx};
 	destination.setSource(callback);
+	destination.setSourceDSPNode(this);
+	
 	return destination;
 }
 
@@ -137,7 +124,9 @@ ofxAudioUnitDSPNode& ofxAudioUnitDSPNode::connectTo(ofxAudioUnitDSPNode &destina
 void ofxAudioUnitDSPNode::setSource(ofxAudioUnit * source)
 // ----------------------------------------------------------
 {
-	_impl->ctx.sourceUnit = source;
+	
+	
+	setSourceAU(source);
 	_impl->ctx.sourceType = NodeSourceUnit;
 	_impl->channelsToBuffer = source->getNumOutputChannels();
 	setBufferSize(_impl->samplesToBuffer);
@@ -194,19 +183,6 @@ unsigned int ofxAudioUnitDSPNode::getBufferSize() const
 
 #pragma mark - Getting Samples
 
-// ----------------------------------------------------------
-void ExtractSamplesFromCircularBuffer(std::vector<Float32> &outBuffer, TPCircularBuffer * circularBuffer)
-// ----------------------------------------------------------
-{
-	if(!circularBuffer) {
-		outBuffer.clear();
-	} else {
-		int32_t circBufferSize;
-		Float32 * circBufferTail = (Float32 *)TPCircularBufferTail(circularBuffer, &circBufferSize);
-		Float32 * circBufferHead = circBufferTail + (circBufferSize / sizeof(Float32));
-		outBuffer.assign(circBufferTail, circBufferHead);
-	}
-}
 
 void ofxAudioUnitDSPNode::getSamplesFromChannel(std::vector<Float32> &samples, unsigned int channel) const
 {
@@ -226,17 +202,17 @@ void ofxAudioUnitDSPNode::setProcessCallback(AURenderCallbackStruct processCallb
 
 #pragma mark - Render callbacks
 
-inline void CopyAudioBufferIntoCircularBuffer(TPCircularBuffer * circBuffer, const AudioBuffer &audioBuffer)
-{
-	int32_t availableBytesInCircBuffer;
-	TPCircularBufferHead(circBuffer, &availableBytesInCircBuffer);
-	
-	if(availableBytesInCircBuffer < audioBuffer.mDataByteSize) {
-		TPCircularBufferConsume(circBuffer, audioBuffer.mDataByteSize - availableBytesInCircBuffer);
-	}
-	
-	TPCircularBufferProduceBytes(circBuffer, audioBuffer.mData, audioBuffer.mDataByteSize);
-}
+//inline void CopyAudioBufferIntoCircularBuffer(TPCircularBuffer * circBuffer, const AudioBuffer &audioBuffer)
+//{
+//	int32_t availableBytesInCircBuffer;
+//	TPCircularBufferHead(circBuffer, &availableBytesInCircBuffer);
+//	
+//	if(availableBytesInCircBuffer < audioBuffer.mDataByteSize) {
+//		TPCircularBufferConsume(circBuffer, audioBuffer.mDataByteSize - availableBytesInCircBuffer);
+//	}
+//	
+//	TPCircularBufferProduceBytes(circBuffer, audioBuffer.mData, audioBuffer.mDataByteSize);
+//}
 
 // ----------------------------------------------------------
 OSStatus RenderAndCopy(void * inRefCon,
@@ -246,13 +222,15 @@ OSStatus RenderAndCopy(void * inRefCon,
 					   UInt32 inNumberFrames,
 					   AudioBufferList * ioData)
 {
-	DSPNodeContext * ctx = static_cast<DSPNodeContext *>(inRefCon);
+	ofxAudioUnitDSPNode::DSPNodeContext * ctx = static_cast<ofxAudioUnitDSPNode::DSPNodeContext *>(inRefCon);
 	
 	OSStatus status;
+
+	ctx->ticks = inTimeStamp->mSampleTime / inNumberFrames;
 	
-	if(ctx->sourceType == NodeSourceUnit && ctx->sourceUnit->getUnitRef()) {
+	if(ctx->sourceType == ofxAudioUnitDSPNode::NodeSourceUnit && ctx->sourceUnit->getUnitRef()) {
 		status = ctx->sourceUnit->render(ioActionFlags, inTimeStamp, ctx->sourceBus, inNumberFrames, ioData);
-	} else if(ctx->sourceType == NodeSourceCallback) {
+	} else if(ctx->sourceType == ofxAudioUnitDSPNode::NodeSourceCallback) {
 		status = (ctx->sourceCallback.inputProc)(ctx->sourceCallback.inputProcRefCon,
 												 ioActionFlags,
 												 inTimeStamp,

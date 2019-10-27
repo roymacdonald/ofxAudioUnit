@@ -3,7 +3,7 @@
 #include <AudioToolbox/AudioToolbox.h>
 #include <iostream>
 #include <sstream>
-
+#include "TPCircularBuffer.h"
 static AudioBufferList * AudioBufferListAlloc(UInt32 channels, UInt32 samplesPerChannel)
 {
 	AudioBufferList * bufferList = NULL;
@@ -37,6 +37,33 @@ static std::string StringForDescription(const AudioComponentDescription &desc)
 	ss << c[11] << c[10] << c[9] << c[8];
 	return ss.str();
 }
+static inline void CopyAudioBufferIntoCircularBuffer(TPCircularBuffer * circBuffer, const AudioBuffer &audioBuffer)
+{
+	int32_t availableBytesInCircBuffer;
+	TPCircularBufferHead(circBuffer, &availableBytesInCircBuffer);
+	
+	if(availableBytesInCircBuffer < audioBuffer.mDataByteSize) {
+		TPCircularBufferConsume(circBuffer, audioBuffer.mDataByteSize - availableBytesInCircBuffer);
+	}
+	
+	TPCircularBufferProduceBytes(circBuffer, audioBuffer.mData, audioBuffer.mDataByteSize);
+}
+
+
+// ----------------------------------------------------------
+static void ExtractSamplesFromCircularBuffer(std::vector<Float32> &outBuffer, TPCircularBuffer * circularBuffer)
+// ----------------------------------------------------------
+{
+	if(!circularBuffer) {
+		outBuffer.clear();
+	} else {
+		int32_t circBufferSize;
+		Float32 * circBufferTail = (Float32 *)TPCircularBufferTail(circularBuffer, &circBufferSize);
+		Float32 * circBufferHead = circBufferTail + (circBufferSize / sizeof(Float32));
+		outBuffer.assign(circBufferTail, circBufferHead);
+	}
+}
+
 
 // these macros make the "do core audio thing, check for error" process less repetitive
 #define OFXAU_PRINT(s, stage)\

@@ -3,6 +3,7 @@
 #include <AudioToolbox/AudioToolbox.h>
 #include <string>
 #include <vector>
+#include <mutex>
 #include "AUParamInfo.h"
 
 typedef std::shared_ptr<AudioUnit> AudioUnitRef;
@@ -67,6 +68,7 @@ public:
 	void setParameter(AudioUnitParameterID property, AudioUnitScope scope, AudioUnitParameterValue value, int bus = 0);
 	void reset(){AudioUnitReset(*_unit, kAudioUnitScope_Global, 0);}
 	
+	AudioStreamBasicDescription getSourceASBD(int sourceBus = 0) const;
 #if !(TARGET_OS_IPHONE)
 	
 	// Retrieves a list of all parameters the unit is advertising (helpful for 3rd party units)
@@ -79,7 +81,51 @@ public:
 				bool forceGeneric = false);
 #endif
 	
+	
+	ofxAudioUnit * getSourceAU(){
+		return sourceUnit;
+	}
+	ofxAudioUnitDSPNode* getSourceDSPNode(){
+		return sourceDSP;
+	}
+	void setSourceAU(ofxAudioUnit * source){
+		sourceUnit = source;
+		sourceDSP = nullptr;
+	}
+	void setSourceDSPNode(ofxAudioUnitDSPNode* source){
+		sourceDSP = source;
+		sourceUnit = nullptr;
+	}
+	std::string getName(){
+		if(name.empty()){
+			return "AudioUnit";
+		}else{
+			return name;
+		}
+	}
+	
+	std::string name;
+	
+	size_t getTicks(){
+		std::lock_guard<std::mutex> lck(timeStampMutex);
+		return ticks;
+	}
+	
+	AudioTimeStamp getCurrentTimeStamp(){
+		std::lock_guard<std::mutex> lck(timeStampMutex);
+		return currentTimeStamp;
+	}
+
+
 protected:
+	ofxAudioUnit * sourceUnit = nullptr;
+	ofxAudioUnitDSPNode * sourceDSP = nullptr;
+	
+	std::mutex timeStampMutex;
+	AudioTimeStamp currentTimeStamp;
+	size_t ticks;
+	
+	
 	AudioUnitRef _unit;
 	AudioComponentDescription _desc;
 	

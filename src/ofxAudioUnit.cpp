@@ -190,7 +190,11 @@ ofxAudioUnit& ofxAudioUnit::connectTo(ofxAudioUnit &otherUnit, int destinationBu
 										 &connection,
 										 sizeof(AudioUnitConnection)),
 					"connecting units");
+		
+		otherUnit.setSourceAU(this);
+		
 	}
+
 	
 	return otherUnit;
 }
@@ -211,10 +215,28 @@ OSStatus ofxAudioUnit::render(AudioUnitRenderActionFlags *ioActionFlags,
 							  AudioBufferList *ioData)
 // ----------------------------------------------------------
 {
+	ticks = inTimeStamp->mSampleTime / inNumberFrames;
+	currentTimeStamp = *inTimeStamp;
 	return AudioUnitRender(*_unit, ioActionFlags, inTimeStamp,
 						   inOutputBusNumber, inNumberFrames, ioData);
 }
-
+// ----------------------------------------------------------
+AudioStreamBasicDescription ofxAudioUnit::getSourceASBD(int sourceBus) const{
+	AudioStreamBasicDescription ASBD = {0};
+	
+	if(_unit) {
+		UInt32 ASBD_size = sizeof(ASBD);
+		
+		OFXAU_PRINT(AudioUnitGetProperty(*_unit,
+										 kAudioUnitProperty_StreamFormat,
+										 kAudioUnitScope_Output,
+										 0,
+										 &ASBD,
+										 &ASBD_size),
+					"getting unit's output ASBD");
+	}
+	return ASBD;
+}
 // ----------------------------------------------------------
 UInt32 ofxAudioUnit::getNumOutputChannels() const
 // ----------------------------------------------------------
