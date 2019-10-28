@@ -82,48 +82,21 @@ public:
 #endif
 	
 	
-	ofxAudioUnit * getSourceAU(){
-		return sourceUnit;
-	}
-	ofxAudioUnitDSPNode* getSourceDSPNode(){
-		return sourceDSP;
-	}
-	void setSourceAU(ofxAudioUnit * source){
-		sourceUnit = source;
-		sourceDSP = nullptr;
-	}
-	void setSourceDSPNode(ofxAudioUnitDSPNode* source){
-		sourceDSP = source;
-		sourceUnit = nullptr;
-	}
-	std::string getName(){
-		if(name.empty()){
-			return "AudioUnit";
-		}else{
-			return name;
-		}
-	}
+	ofxAudioUnit * getSourceAU();
+	ofxAudioUnitDSPNode* getSourceDSPNode();
+	
+	void setSourceDSPNode(ofxAudioUnitDSPNode* source);
+	std::string getName();
 	
 	std::string name;
 	
-	size_t getTicks(){
-		std::lock_guard<std::mutex> lck(timeStampMutex);
-		return ticks;
-	}
-	
-	AudioTimeStamp getCurrentTimeStamp(){
-		std::lock_guard<std::mutex> lck(timeStampMutex);
-		return currentTimeStamp;
-	}
 
 
 protected:
+	
 	ofxAudioUnit * sourceUnit = nullptr;
 	ofxAudioUnitDSPNode * sourceDSP = nullptr;
 	
-	std::mutex timeStampMutex;
-	AudioTimeStamp currentTimeStamp;
-	size_t ticks;
 	
 	
 	AudioUnitRef _unit;

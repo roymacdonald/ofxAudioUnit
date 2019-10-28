@@ -191,7 +191,8 @@ ofxAudioUnit& ofxAudioUnit::connectTo(ofxAudioUnit &otherUnit, int destinationBu
 										 sizeof(AudioUnitConnection)),
 					"connecting units");
 		
-		otherUnit.setSourceAU(this);
+		otherUnit.sourceUnit = this;
+		otherUnit.sourceDSP = nullptr;
 		
 	}
 
@@ -206,6 +207,32 @@ ofxAudioUnitDSPNode& ofxAudioUnit::connectTo(ofxAudioUnitDSPNode &node)
 	node.setSource(this);
 	return node;
 }
+// ----------------------------------------------------------
+ofxAudioUnit * ofxAudioUnit::getSourceAU(){
+// ----------------------------------------------------------
+	return sourceUnit;
+}
+// ----------------------------------------------------------
+ofxAudioUnitDSPNode* ofxAudioUnit::getSourceDSPNode(){
+// ----------------------------------------------------------
+	return sourceDSP;
+}
+
+// ----------------------------------------------------------
+void ofxAudioUnit::setSourceDSPNode(ofxAudioUnitDSPNode* source){
+// ----------------------------------------------------------
+	sourceDSP = source;
+	sourceUnit = nullptr;
+}
+// ----------------------------------------------------------
+std::string ofxAudioUnit::getName(){
+// ----------------------------------------------------------
+	if(name.empty()){
+		return "ofxAudioUnit";
+	}else{
+		return name;
+	}
+}
 
 // ----------------------------------------------------------
 OSStatus ofxAudioUnit::render(AudioUnitRenderActionFlags *ioActionFlags,
@@ -215,8 +242,6 @@ OSStatus ofxAudioUnit::render(AudioUnitRenderActionFlags *ioActionFlags,
 							  AudioBufferList *ioData)
 // ----------------------------------------------------------
 {
-	ticks = inTimeStamp->mSampleTime / inNumberFrames;
-	currentTimeStamp = *inTimeStamp;
 	return AudioUnitRender(*_unit, ioActionFlags, inTimeStamp,
 						   inOutputBusNumber, inNumberFrames, ioData);
 }
