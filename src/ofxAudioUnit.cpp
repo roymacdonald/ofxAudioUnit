@@ -463,3 +463,40 @@ void ofxAudioUnit::setRenderCallback(AURenderCallbackStruct callback, int bus)
 									 sizeof(callback)),
 				"setting render callback");
 }
+// ----------------------------------------------------------
+void ofxAudioUnit::setBypass(bool bBypass)
+// ----------------------------------------------------------
+{
+   UInt32 value = (bBypass ? 1 : 0);
+
+    OFXAU_PRINT(AudioUnitSetProperty(*_unit,
+                                 kAudioUnitProperty_BypassEffect,
+                                 kAudioUnitScope_Global,
+                                 0,
+                                 &value,
+                                 sizeof(value)),
+                "setting bypass");
+}
+
+// ----------------------------------------------------------
+bool ofxAudioUnit::isBypassed() const
+// ----------------------------------------------------------
+{
+    
+    UInt32 value;
+    
+    if(_unit) {
+        UInt32 valueSize = sizeof(value);
+        
+        OFXAU_PRINT(AudioUnitGetProperty(*_unit,
+                                         kAudioUnitProperty_BypassEffect,
+                                         kAudioUnitScope_Output,
+                                         0,
+                                         &value,
+                                         &valueSize),
+                    "getting is bypassed");
+
+    
+    }
+    return (value > 0 );
+}

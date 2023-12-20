@@ -89,8 +89,11 @@ public:
 	std::string getName();
 	
 	std::string name;
+    
+    void setBypass(bool bBypass);
+    
 	
-
+    bool isBypassed() const;
 
 protected:
 	
