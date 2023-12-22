@@ -7,7 +7,7 @@ meta:
 
 common:
 	ADDON_FRAMEWORKS = CoreMIDI
-		
+	ADDON_DEFINES = USING_OFX_AUDIO_UNIT
 osx:
 	ADDON_FRAMEWORKS += CoreAudioKit
 	ADDON_FRAMEWORKS += AudioUnit
